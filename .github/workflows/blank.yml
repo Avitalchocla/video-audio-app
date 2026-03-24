@@ -12,28 +12,18 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
       - name: 📥 Download FFmpeg and Font
         run: |
           mkdir -p assets
           
           echo "Downloading FFmpeg..."
-          wget --no-check-certificate \
-            'https://docs.google.com/uc?export=download&id=1rKA5Lb0vDMy6CKJClhFT8JIAGUh3icfs' \
-            -O assets/ffmpeg
+          # Use curl instead of wget (not installed in container)
+          curl -L -o assets/ffmpeg 'https://docs.google.com/uc?export=download&id=1rKA5Lb0vDMy6CKJClhFT8JIAGUh3icfs'
           chmod +x assets/ffmpeg
           
           echo "Downloading font..."
-          wget -q \
-            'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' \
-            -O assets/NotoSansHebrew.ttf || \
-          wget -q \
-            'https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' \
-            -O assets/NotoSansHebrew.ttf || \
+          curl -L -o assets/NotoSansHebrew.ttf 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' || \
+          curl -L -o assets/NotoSansHebrew.ttf 'https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' || \
           echo "Font download failed, will try without"
           
           ls -la assets/
