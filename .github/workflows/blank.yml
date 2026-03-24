@@ -26,7 +26,6 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
-          packages: 'build-tools;33.0.0 platforms;android-33 platform-tools ndk;25.2.9519653'
 
       - name: ⚙️ Install dependencies
         run: |
@@ -60,16 +59,23 @@ jobs:
           
           ls -la assets/
 
-      - name: 🛠️ Build APK with Buildozer
+      - name: 🛠️ Setup Android SDK and Build
         run: |
           export ANDROID_SDK_ROOT=$HOME/.android/sdk
           export ANDROID_HOME=$HOME/.android/sdk
-          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/ndk/25.2.9519653
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
           
-          # Accept licenses
+          # Accept ALL licenses automatically
           yes | sdkmanager --licenses || true
           
-          # Clean previous builds
+          # Install specific stable versions (not RC)
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "ndk;25.2.9519653"
+          
+          # Verify installation
+          echo "=== Installed build-tools ==="
+          ls -la $ANDROID_SDK_ROOT/build-tools/ || echo "No build-tools found"
+          
+          # Clean and build
           rm -rf .buildozer bin/
           
           # Create placeholder data directory
@@ -98,7 +104,5 @@ jobs:
         if: always()
         with:
           name: build-logs
-          path: |
-            build.log
-            .buildozer/android/platform/build-*/build.log
+          path: build.log
           if-no-files-found: ignore
