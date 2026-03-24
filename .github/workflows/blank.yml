@@ -26,7 +26,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
-          packages: 'build-tools;33.0.0 platforms;android-33 platform-tools'
+          packages: 'build-tools;33.0.0 platforms;android-33 platform-tools ndk;25.2.9519653'
 
       - name: ⚙️ Install dependencies
         run: |
@@ -34,7 +34,8 @@ jobs:
           sudo apt install -y \
             git zip unzip python3-pip autoconf automake libtool pkg-config \
             zlib1g-dev libncurses5 libncursesw5 cmake libffi-dev libssl-dev \
-            patch python3-setuptools build-essential wget file
+            patch python3-setuptools build-essential wget file libltdl-dev \
+            libpq-dev automake
           pip install --upgrade pip
           pip install buildozer cython==0.29.33
 
@@ -42,14 +43,12 @@ jobs:
         run: |
           mkdir -p assets
           
-          # Download FFmpeg from Google Drive
           echo "Downloading FFmpeg..."
           wget --no-check-certificate \
             'https://docs.google.com/uc?export=download&id=1rKA5Lb0vDMy6CKJClhFT8JIAGUh3icfs' \
             -O assets/ffmpeg
           chmod +x assets/ffmpeg
           
-          # Download Hebrew font
           echo "Downloading font..."
           wget -q \
             'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' \
@@ -57,55 +56,12 @@ jobs:
           wget -q \
             'https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' \
             -O assets/NotoSansHebrew.ttf || \
-          echo "Font download failed, continuing without"
+          echo "Font download failed, will try without"
           
-          echo "Assets folder contents:"
           ls -la assets/
 
-      - name: 🔍 Verify files
-        run: |
-          echo "=== Checking files ==="
-          ls -la
-          test -f main.py && echo "✓ main.py exists" || echo "✗ main.py missing"
-          test -f buildozer.spec && echo "✓ buildozer.spec exists" || echo "✗ buildozer.spec missing"
-          test -d assets && echo "✓ assets folder exists" || echo "✗ assets missing"
-          test -f assets/ffmpeg && echo "✓ ffmpeg exists" || echo "✗ ffmpeg missing"
-
-      - name: 🛠️ Accept Android Licenses
-        run: |
-          export ANDROID_SDK_ROOT=$HOME/.android/sdk
-          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
-          yes | sdkmanager --licenses || true
-          sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools" "ndk;25.2.9519653"
-
-      - name: 🏗️ Build APK
+      - name: 🛠️ Setup Environment and Build
         run: |
           export ANDROID_SDK_ROOT=$HOME/.android/sdk
           export ANDROID_HOME=$HOME/.android/sdk
-          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/ndk/25.2.9519653
-          
-          rm -rf .buildozer bin/
-          
-          echo "=== Starting Buildozer ==="
-          buildozer -v android debug 2>&1 | tee build.log
-          
-          echo "=== Build finished ==="
-          find . -name "*.apk" -type f 2>/dev/null || true
-
-      - name: 📤 Upload APK
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: VideoAudioReplacer-APK
-          path: |
-            bin/*.apk
-            .buildozer/android/platform/build-*/dists/*/bin/*.apk
-          if-no-files-found: warn
-
-      - name: 📋 Upload logs on failure
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: build-logs
-          path: build.log
-          if-no-files-found: ignore
+          export PATH
