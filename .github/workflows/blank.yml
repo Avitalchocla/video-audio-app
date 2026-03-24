@@ -60,8 +60,45 @@ jobs:
           
           ls -la assets/
 
-      - name: 🛠️ Setup Environment and Build
+      - name: 🛠️ Build APK with Buildozer
         run: |
           export ANDROID_SDK_ROOT=$HOME/.android/sdk
           export ANDROID_HOME=$HOME/.android/sdk
-          export PATH
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/ndk/25.2.9519653
+          
+          # Accept licenses
+          yes | sdkmanager --licenses || true
+          
+          # Clean previous builds
+          rm -rf .buildozer bin/
+          
+          # Create placeholder data directory
+          mkdir -p data
+          touch data/presplash.png
+          touch data/icon.png
+          
+          echo "=== Starting Buildozer ==="
+          buildozer android debug 2>&1 | tee build.log
+          
+          echo "=== Build finished ==="
+          find . -name "*.apk" -type f 2>/dev/null || true
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VideoAudioReplacer-APK
+          path: |
+            bin/*.apk
+            .buildozer/android/platform/build-*/dists/*/bin/*.apk
+          if-no-files-found: warn
+
+      - name: 📋 Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs
+          path: |
+            build.log
+            .buildozer/android/platform/build-*/build.log
+          if-no-files-found: ignore
