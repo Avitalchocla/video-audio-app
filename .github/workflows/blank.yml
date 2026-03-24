@@ -26,7 +26,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
-          packages: 'build-tools;33.0.0 platforms;android-33'
+          packages: 'build-tools;33.0.0 platforms;android-33 platform-tools'
 
       - name: ⚙️ Install system dependencies
         run: |
@@ -47,15 +47,18 @@ jobs:
             'https://docs.google.com/uc?export=download&id=1rKA5Lb0vDMy6CKJClhFT8JIAGUh3icfs' \
             -O assets/ffmpeg
           chmod +x assets/ffmpeg
-          echo "Downloading Hebrew font..."
-          wget -q \
-            'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' \
-            -O assets/NotoSansHebrew.ttf || \
-          wget -q \
-            'https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf' \
-            -O assets/NotoSansHebrew.ttf || \
-          echo "Font download failed, will use system font"
-          echo "Assets:"
+          ls -la assets/ffmpeg
+          file assets/ffmpeg
+
+      - name: 🔍 Check project files
+        run: |
+          echo "=== Project structure ==="
+          ls -la
+          echo "=== main.py exists? ==="
+          test -f main.py && echo "YES" || echo "NO"
+          echo "=== buildozer.spec exists? ==="
+          test -f buildozer.spec && echo "YES" || echo "NO"
+          echo "=== assets folder ==="
           ls -la assets/
 
       - name: 🛠️ Accept Android Licenses
@@ -63,23 +66,39 @@ jobs:
           export ANDROID_SDK_ROOT=$HOME/.android/sdk
           export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
           yes | sdkmanager --licenses || true
-          sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+          sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools" "ndk;25.2.9519653"
 
-      - name: 🛠️ Build APK with Buildozer
+      - name: 🏗️ Build APK with Buildozer
         run: |
           export ANDROID_SDK_ROOT=$HOME/.android/sdk
           export ANDROID_HOME=$HOME/.android/sdk
-          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/ndk/25.2.9519653
           
           rm -rf .buildozer bin/
-          export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
-          export JAVA_OPTS="-Xmx4096m"
           
-          buildozer -v android debug 2>&1 | tee build.log
+          # Debug info
+          echo "=== Environment ==="
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          which sdkmanager
+          which buildozer
           
-          echo "=== Build finished ==="
-          ls -la bin/ 2>/dev/null || echo "No bin directory"
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
+          echo "=== Starting build ==="
+          buildozer -v android debug 2>&1 | tee build.log || {
+            echo "=== BUILD FAILED ==="
+            echo "Last 100 lines of log:"
+            tail -100 build.log
+            exit 1
+          }
+
+      - name: 🔍 Find APK
+        if: always()
+        run: |
+          echo "=== Looking for APK ==="
+          find . -name "*.apk" -type f 2>/dev/null
+          echo "=== Bin directory ==="
+          ls -la bin/ 2>/dev/null || echo "No bin dir"
+          echo "=== Buildozer dists ==="
+          ls -la .buildozer/android/platform/build-*/dists/*/bin/ 2>/dev/null || echo "No dists found"
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -89,17 +108,15 @@ jobs:
           path: |
             bin/*.apk
             .buildozer/android/platform/build-*/dists/*/bin/*.apk
+            .buildozer/android/platform/build-*/dists/*/*/*.apk
           if-no-files-found: warn
-          retention-days: 7
 
-      - name: 📋 Upload build logs on failure
+      - name: 📋 Upload build logs
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: build-logs
           path: |
             build.log
             .buildozer/android/platform/build-*/build.log
-            .buildozer/android/platform/python-for-android/dists/*/build.log
           if-no-files-found: ignore
-          retention-days: 3
