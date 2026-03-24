@@ -1,0 +1,71 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container: kivy/buildozer:latest
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download FFmpeg and Font
+        run: |
+          mkdir -p assets
+          
+          echo "Downloading FFmpeg..."
+          python3 << 'PYEOF'
+import urllib.request
+import ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+urllib.request.urlretrieve('https://docs.google.com/uc?export=download&id=1rKA5Lb0vDMy6CKJClhFT8JIAGUh3icfs', 'assets/ffmpeg')
+PYEOF
+          chmod +x assets/ffmpeg
+          
+          echo "Downloading font..."
+          python3 << 'PYEOF' || echo "Font download failed, will try without"
+import urllib.request
+try:
+    urllib.request.urlretrieve('https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf', 'assets/NotoSansHebrew.ttf')
+except:
+    urllib.request.urlretrieve('https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf', 'assets/NotoSansHebrew.ttf')
+PYEOF
+          
+          ls -la assets/
+
+      - name: 🛠️ Build APK
+        run: |
+          mkdir -p data
+          touch data/presplash.png
+          touch data/icon.png
+          
+          yes | /root/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
+          
+          echo "=== Starting Buildozer ==="
+          buildozer android debug 2>&1 | tee build.log
+          
+          echo "=== Build finished ==="
+          find . -name "*.apk" -type f 2>/dev/null || true
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VideoAudioReplacer-APK
+          path: |
+            bin/*.apk
+            .buildozer/android/platform/build-*/dists/*/bin/*.apk
+          if-no-files-found: warn
+
+      - name: 📋 Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs
+          path: build.log
+          if-no-files-found: ignore
